@@ -8,7 +8,10 @@ import (
 
 func TestFeatures(t *testing.T) {
 	suite := godog.TestSuite{
-		ScenarioInitializer: InitializeScenario,
+		ScenarioInitializer: func(sc *godog.ScenarioContext) {
+			InitializeScenario(sc)
+			InitializeDAXScenario(sc)
+		},
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"."},
