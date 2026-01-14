@@ -1,0 +1,11 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: cmd/api/Dockerfile
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - ENVIRONMENT=production
+    restart: unless-stopped

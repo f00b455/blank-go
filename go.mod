@@ -1,6 +1,6 @@
 module github.com/f00b455/blank-go
 
-go 1.25.5
+go 1.23
 
 require (
 	github.com/gin-gonic/gin v1.11.0
