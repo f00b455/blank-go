@@ -11,6 +11,7 @@ import (
 
 	"github.com/f00b455/blank-go/internal/config"
 	"github.com/f00b455/blank-go/internal/handlers"
+	"github.com/f00b455/blank-go/pkg/task"
 	"github.com/gin-gonic/gin"
 )
 
@@ -61,9 +62,21 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	router.GET("/health", handlers.HealthCheck)
 
+	// Initialize task service and handler
+	taskRepo := task.NewInMemoryRepository()
+	taskService := task.NewService(taskRepo)
+	taskHandler := handlers.NewTaskHandler(taskService)
+
 	api := router.Group("/api/v1")
 	{
 		api.GET("/ping", handlers.Ping)
+
+		// Task routes
+		api.POST("/tasks", taskHandler.CreateTask)
+		api.GET("/tasks", taskHandler.ListTasks)
+		api.GET("/tasks/:id", taskHandler.GetTask)
+		api.PUT("/tasks/:id", taskHandler.UpdateTask)
+		api.DELETE("/tasks/:id", taskHandler.DeleteTask)
 	}
 
 	return router
