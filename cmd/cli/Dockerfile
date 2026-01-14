@@ -10,7 +10,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build static binary
+# Ensure go.mod is up to date and build static binary
+RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -ldflags="-w -s" -o cli ./cmd/cli
 
