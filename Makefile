@@ -80,11 +80,7 @@ test: deps
 # Run BDD tests (Cucumber with Godog)
 test-bdd: deps build
 	@echo "Running BDD tests..."
-	@echo "Building binaries first..."
-	@echo "Running shared package BDD tests..."
-	$(GOCMD) test -v ./features/ -run TestSharedFeatures
-	@echo "Running API endpoint BDD tests..."
-	$(GOCMD) test -v ./features/ -run TestAPIFeatures
+	$(GOCMD) test -v ./features/...
 
 # Run all BDD tests
 test-bdd-all: deps build
