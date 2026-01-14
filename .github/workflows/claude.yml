@@ -46,4 +46,4 @@ jobs:
           claude_args: |
             --allowed-tools "Read,Edit,Write,MultiEdit,Glob,Grep,Bash(go build:*),Bash(go test:*),Bash(go mod:*),Bash(go get:*),Bash(go tool:*),Bash(make:*),Bash(./bin/*),Bash(mkdir:*),Bash(touch:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr comment:*),Bash(gh pr checks:*),Bash(gh pr view:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh api:*)"
             --model claude-sonnet-4-5-20250929
-            --max-turns 50
+            --max-turns 100
