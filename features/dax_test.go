@@ -13,24 +13,45 @@ import (
 	"strings"
 
 	"github.com/cucumber/godog"
-	"github.com/f00b455/blank-go/internal/config"
-	"github.com/f00b455/blank-go/internal/database"
 	"github.com/f00b455/blank-go/internal/handlers"
 	"github.com/f00b455/blank-go/pkg/dax"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type daxContext struct {
-	db            *gorm.DB
+	repo          dax.Repository
+	service       *dax.Service
+	handler       *handlers.DAXHandler
 	router        *gin.Engine
 	response      *httptest.ResponseRecorder
 	lastResponse  map[string]interface{}
 	errorResponse map[string]interface{}
 }
 
+func (ctx *daxContext) reset() {
+	gin.SetMode(gin.TestMode)
+	ctx.repo = dax.NewInMemoryRepository()
+	ctx.service = dax.NewService(ctx.repo)
+	ctx.handler = handlers.NewDAXHandler(ctx.service)
+	ctx.setupRouter()
+
+	ctx.response = nil
+	ctx.lastResponse = nil
+	ctx.errorResponse = nil
+}
+
+func (ctx *daxContext) setupRouter() {
+	ctx.router = gin.New()
+	api := ctx.router.Group("/api/v1/dax")
+	{
+		api.POST("/import", ctx.handler.ImportCSV)
+		api.GET("", ctx.handler.GetByFilters)
+		api.GET("/metrics", ctx.handler.GetMetrics)
+	}
+}
+
 func (ctx *daxContext) cleanDatabase() {
-	ctx.db.Exec("DELETE FROM dax")
+	ctx.repo.DeleteAll()
 }
 
 func (ctx *daxContext) theDAXAPIIsAvailable() error {
@@ -99,11 +120,13 @@ func (ctx *daxContext) theResponseShouldIndicateRecordsImported(expectedCount in
 }
 
 func (ctx *daxContext) theDatabaseShouldContainDAXRecords(expectedCount int) error {
-	var count int64
-	ctx.db.Model(&dax.DAXRecord{}).Count(&count)
+	count, err := ctx.repo.Count()
+	if err != nil {
+		return err
+	}
 
-	if int(count) != expectedCount {
-		return fmt.Errorf("expected %d records in database, got %d", expectedCount, int(count))
+	if count != expectedCount {
+		return fmt.Errorf("expected %d records in database, got %d", expectedCount, count)
 	}
 
 	return nil
@@ -141,23 +164,25 @@ func (ctx *daxContext) theFollowingDAXRecordExists(table *godog.Table) error {
 		}
 	}
 
-	return ctx.db.Create(&record).Error
+	return ctx.repo.Create(&record)
 }
 
-func (ctx *daxContext) theEBITDAValueForSIEShouldBe(expectedValue float64) error {
-	var record dax.DAXRecord
-	err := ctx.db.Where("ticker = ? AND year = ? AND metric = ?", "SIE", 2025, "EBITDA").
-		First(&record).Error
-
+func (ctx *daxContext) theEBITDAValueForSIEShouldBe(year int, expectedValue float64) error {
+	records, _, err := ctx.repo.FindByFilters("SIE", &year, 1, 100)
 	if err != nil {
 		return err
 	}
 
-	if record.Value == nil || *record.Value != expectedValue {
-		return fmt.Errorf("expected EBITDA value %f, got %f", expectedValue, *record.Value)
+	for _, record := range records {
+		if record.Metric == "EBITDA" {
+			if record.Value == nil || *record.Value != expectedValue {
+				return fmt.Errorf("expected EBITDA value %f, got %f", expectedValue, *record.Value)
+			}
+			return nil
+		}
 	}
 
-	return nil
+	return fmt.Errorf("EBITDA record not found for SIE in %d", year)
 }
 
 func (ctx *daxContext) theErrorResponseShouldContain(expectedError string) error {
@@ -245,7 +270,7 @@ func (ctx *daxContext) theFollowingDAXRecordsExist(table *godog.Table) error {
 			}
 		}
 
-		if err := ctx.db.Create(&record).Error; err != nil {
+		if err := ctx.repo.Create(&record); err != nil {
 			return err
 		}
 	}
@@ -445,43 +470,7 @@ func InitializeDAXScenario(sc *godog.ScenarioContext) {
 	ctx := &daxContext{}
 
 	sc.Before(func(c context.Context, sc *godog.Scenario) (context.Context, error) {
-		cfg := &config.DatabaseConfig{
-			Host:     "localhost",
-			Port:     "5432",
-			User:     "dax_user",
-			Password: "dax_password",
-			Name:     "dax_test_db",
-			SSLMode:  "disable",
-		}
-
-		db, err := database.Connect(cfg)
-		if err != nil {
-			return c, fmt.Errorf("failed to connect to test database: %w", err)
-		}
-
-		if err := dax.AutoMigrate(db); err != nil {
-			return c, fmt.Errorf("failed to migrate test database: %w", err)
-		}
-
-		ctx.db = db
-
-		gin.SetMode(gin.TestMode)
-		router := gin.New()
-
-		daxRepo := dax.NewPostgresRepository(ctx.db)
-		daxService := dax.NewService(daxRepo)
-		daxHandler := handlers.NewDAXHandler(daxService)
-
-		api := router.Group("/api/v1/dax")
-		{
-			api.POST("/import", daxHandler.ImportCSV)
-			api.GET("", daxHandler.GetByFilters)
-			api.GET("/metrics", daxHandler.GetMetrics)
-		}
-
-		ctx.router = router
-		ctx.cleanDatabase()
-
+		ctx.reset()
 		return c, nil
 	})
 
