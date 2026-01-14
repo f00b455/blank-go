@@ -51,7 +51,7 @@ func (ctx *daxContext) setupRouter() {
 }
 
 func (ctx *daxContext) cleanDatabase() {
-	ctx.repo.DeleteAll()
+	_ = ctx.repo.DeleteAll()
 }
 
 func (ctx *daxContext) theDAXAPIIsAvailable() error {
