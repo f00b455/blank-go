@@ -1,17 +1,18 @@
 services:
   postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: dax_user
-      POSTGRES_PASSWORD: dax_password
-      POSTGRES_DB: dax_db
+    container_name: dax-postgres
     ports:
       - "5432:5432"
+    environment:
+      - POSTGRES_USER=dax_user
+      - POSTGRES_PASSWORD=dax_password
+      - POSTGRES_DB=dax_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dax_user -d dax_db"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
@@ -25,7 +26,12 @@ services:
     environment:
       - PORT=3002
       - ENVIRONMENT=production
-      - DATABASE_URL=postgres://dax_user:dax_password@postgres:5432/dax_db?sslmode=disable
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=dax_user
+      - DB_PASSWORD=dax_password
+      - DB_NAME=dax_db
+      - DB_SSLMODE=disable
     depends_on:
       postgres:
         condition: service_healthy
