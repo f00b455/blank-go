@@ -10,9 +10,12 @@ import (
 	"time"
 
 	"github.com/f00b455/blank-go/internal/config"
+	"github.com/f00b455/blank-go/internal/database"
 	"github.com/f00b455/blank-go/internal/handlers"
+	"github.com/f00b455/blank-go/pkg/dax"
 	"github.com/f00b455/blank-go/pkg/task"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -22,7 +25,18 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	router := setupRouter(cfg)
+	// Connect to PostgreSQL
+	db, err := database.Connect(&cfg.Database)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
+	// Auto-migrate DAX schema
+	if err := dax.AutoMigrate(db); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	router := setupRouter(cfg, db)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -55,7 +69,7 @@ func main() {
 	log.Println("Server exited")
 }
 
-func setupRouter(cfg *config.Config) *gin.Engine {
+func setupRouter(cfg *config.Config, db interface{}) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
@@ -77,6 +91,20 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		api.GET("/tasks/:id", taskHandler.GetTask)
 		api.PUT("/tasks/:id", taskHandler.UpdateTask)
 		api.DELETE("/tasks/:id", taskHandler.DeleteTask)
+
+		// DAX routes (only if database is available)
+		if db != nil {
+			daxRepo := dax.NewPostgresRepository(db.(*gorm.DB))
+			daxService := dax.NewService(daxRepo)
+			daxHandler := handlers.NewDAXHandler(daxService)
+
+			daxGroup := api.Group("/dax")
+			{
+				daxGroup.POST("/import", daxHandler.ImportCSV)
+				daxGroup.GET("", daxHandler.GetByFilters)
+				daxGroup.GET("/metrics", daxHandler.GetMetrics)
+			}
+		}
 	}
 
 	return router
