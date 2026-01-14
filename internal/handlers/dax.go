@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/f00b455/blank-go/pkg/dax"
 	"github.com/gin-gonic/gin"
@@ -42,12 +43,15 @@ func (h *DAXHandler) ImportCSV(c *gin.Context) {
 	response, err := h.service.ImportCSV(openedFile)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "missing required fields" ||
-			err.Error() == "invalid year" {
+		errMsg := err.Error()
+		// Check if it's a validation error (missing fields or invalid data)
+		if strings.Contains(errMsg, "missing required fields") ||
+			strings.Contains(errMsg, "invalid year") ||
+			strings.Contains(errMsg, "invalid data at row") {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{
-			"error": err.Error(),
+			"error": errMsg,
 		})
 		return
 	}

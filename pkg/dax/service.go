@@ -135,6 +135,11 @@ func (s *Service) GetMetrics(ticker string) (*MetricsResponse, error) {
 		return nil, err
 	}
 
+	// Ensure metrics is never nil, use empty slice instead
+	if metrics == nil {
+		metrics = []string{}
+	}
+
 	return &MetricsResponse{
 		Ticker:  ticker,
 		Metrics: metrics,
