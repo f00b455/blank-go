@@ -1,0 +1,119 @@
+name: Auto Review on Green CI
+
+on:
+  workflow_run:
+    workflows: ["Go CI/CD"]
+    types: [completed]
+
+jobs:
+  auto-review:
+    # Only run if CI passed and it was triggered by a pull request
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+      checks: read
+      id-token: write
+
+    steps:
+      - name: Get PR number
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pulls = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`
+            });
+
+            if (pulls.data.length === 0) {
+              core.setFailed('No open PR found for this branch');
+              return;
+            }
+
+            const pr = pulls.data[0];
+            core.setOutput('number', pr.number);
+            console.log(`Found PR #${pr.number}`);
+
+      - name: Check if already reviewed
+        id: check_review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.pr.outputs.number }}
+            });
+
+            // Check if Claude has already reviewed this PR
+            const claudeReviews = comments.filter(c =>
+              (c.user.login === 'claude' || c.body.includes('Claude Code Review')) &&
+              c.body.includes('✅ APPROVED')
+            );
+
+            if (claudeReviews.length > 0) {
+              console.log('PR already reviewed and approved by Claude');
+              core.setOutput('already_reviewed', 'true');
+            } else {
+              console.log('No existing Claude approval found');
+              core.setOutput('already_reviewed', 'false');
+            }
+
+      - name: Checkout repository
+        if: steps.check_review.outputs.already_reviewed == 'false'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+
+      - name: Run Claude Code Review
+        if: steps.check_review.outputs.already_reviewed == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            🎉 All CI checks have passed! Please review this pull request.
+
+            **Review Focus:**
+            1. **Code Quality**: Check for clean code principles, proper naming, and structure
+            2. **Best Practices**: Verify adherence to Go best practices and project conventions
+            3. **Potential Bugs**: Look for edge cases, error handling issues, or logic errors
+            4. **Security**: Check for security vulnerabilities or unsafe practices
+            5. **Test Coverage**: Verify tests are comprehensive and meaningful
+            6. **Documentation**: Ensure code is well-documented where needed
+
+            **Guidelines:**
+            - Use the repository's CLAUDE.md for project-specific conventions
+            - Be constructive and helpful in feedback
+            - Focus on significant issues, not minor nitpicks
+            - Consider the context: small fixes need lighter review than major features
+
+            **Review Format:**
+            At the end of your review, clearly state one of:
+            - "✅ **APPROVED** - Code looks good, ready to merge" if no significant issues
+            - "💭 **COMMENT** - Suggestions for improvement (non-blocking)" if minor issues
+            - "🔧 **CHANGES REQUESTED** - Issues found that should be fixed" if there are problems
+
+            Use `gh pr comment` to post your review on PR #${{ steps.pr.outputs.number }}.
+
+          claude_args: |
+            --allowed-tools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(git log:*),Bash(make lint:*)"
+            --max-turns 30
+
+      - name: Log completion
+        if: always()
+        run: |
+          if [[ "${{ steps.check_review.outputs.already_reviewed }}" == "true" ]]; then
+            echo "✅ PR already reviewed - skipped duplicate review"
+          else
+            echo "✅ Claude review posted on PR #${{ steps.pr.outputs.number }}"
+          fi

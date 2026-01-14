@@ -1,0 +1,60 @@
+# Go binaries and build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+
+# Go workspace file
+go.work
+
+# Dependencies
+vendor/
+
+# Environment variables
+.env
+.env.local
+
+# Test coverage
+coverage.out
+coverage.html
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary folders
+tmp/
+temp/
+
+# Backup directory
+.backup/
+
+# Hugo generated files
+site/public/
+site/resources/
+site/.hugo_build.lock
+*.hugo_build.lock
+
+# Test Hugo site (generated during BDD tests)
+features/site/public/
+features/site/resources/
+features/site/.hugo_build.lock

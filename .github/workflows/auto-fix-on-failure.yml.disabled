@@ -1,0 +1,238 @@
+name: Auto Fix on CI Failure
+
+on:
+  workflow_run:
+    workflows: ["Go CI/CD"]
+    types: [completed]
+
+jobs:
+  auto-fix:
+    # Only run if the workflow failed and it was triggered by a pull request
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+      actions: read
+      statuses: read
+      id-token: write
+
+    steps:
+      - name: Get PR number
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pulls = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`
+            });
+
+            if (pulls.data.length === 0) {
+              core.setFailed('No open PR found for this branch');
+              return;
+            }
+
+            const pr = pulls.data[0];
+            core.setOutput('number', pr.number);
+            core.setOutput('head_ref', context.payload.workflow_run.head_branch);
+            core.setOutput('head_sha', context.payload.workflow_run.head_sha);
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check iteration count
+        id: iteration
+        run: |
+          # Count how many auto-fix attempts have been made
+          ATTEMPT_COUNT=$(git log --oneline --grep="fix: auto-fix CI failures (attempt" | wc -l)
+          NEXT_ATTEMPT=$((ATTEMPT_COUNT + 1))
+
+          echo "attempt_count=$ATTEMPT_COUNT" >> $GITHUB_OUTPUT
+          echo "next_attempt=$NEXT_ATTEMPT" >> $GITHUB_OUTPUT
+
+          if [[ $NEXT_ATTEMPT -gt 3 ]]; then
+            echo "max_attempts_reached=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Max retry attempts (3) reached"
+          else
+            echo "max_attempts_reached=false" >> $GITHUB_OUTPUT
+            echo "📊 Attempt $NEXT_ATTEMPT of 3"
+          fi
+
+      - name: Stop if max attempts reached
+        if: steps.iteration.outputs.max_attempts_reached == 'true'
+        run: |
+          gh pr comment ${{ steps.pr.outputs.number }} --body "⚠️ **Auto-Fix Limit Reached**
+
+          The automatic fix workflow has attempted to fix CI failures 3 times without success.
+
+          **Next Steps:**
+          1. Review the auto-fix commits to understand what was attempted
+          2. Manually investigate the remaining issues
+          3. Use \`/fix-ci\` command if you want to retry with manual oversight
+
+          [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+          exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Get failed checks
+        id: failures
+        run: |
+          PR_NUMBER="${{ steps.pr.outputs.number }}"
+
+          # Wait for checks to be available
+          sleep 10
+
+          # Get all failing checks with their run URLs
+          FAILURES=""
+          LINT_RUN_URL=""
+          TEST_RUN_URL=""
+          BUILD_RUN_URL=""
+
+          echo "🔍 Checking for failures in PR #$PR_NUMBER..."
+
+          while IFS=$'\t' read -r NAME STATUS DURATION URL; do
+            if [[ "$STATUS" == "fail" ]]; then
+              FAILURES="$FAILURES $NAME"
+              echo "❌ Found failure: $NAME"
+              case "$NAME" in
+                Lint) LINT_RUN_URL="$URL" ;;
+                Test) TEST_RUN_URL="$URL" ;;
+                Build) BUILD_RUN_URL="$URL" ;;
+              esac
+            fi
+          done < <(gh pr checks $PR_NUMBER 2>/dev/null | grep -E "^(Lint|Test|Build)" || echo "")
+
+          if [[ -z "$FAILURES" ]]; then
+            echo "✅ No failures found - checks may have passed after retry"
+            echo "has_failures=false" >> $GITHUB_OUTPUT
+          else
+            echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+            echo "lint_run_url=$LINT_RUN_URL" >> $GITHUB_OUTPUT
+            echo "test_run_url=$TEST_RUN_URL" >> $GITHUB_OUTPUT
+            echo "build_run_url=$BUILD_RUN_URL" >> $GITHUB_OUTPUT
+            echo "has_failures=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fix CI failures with Claude
+        if: steps.failures.outputs.has_failures == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            🤖 **Automatic CI Failure Fix - Attempt ${{ steps.iteration.outputs.next_attempt }}/3**
+
+            The CI pipeline has failed with the following checks:
+            **Failed checks:** ${{ steps.failures.outputs.failures }}
+
+            **Your task:**
+            1. Fetch and analyze the CI logs from these URLs:
+               - Lint: ${{ steps.failures.outputs.lint_run_url }}
+               - Test: ${{ steps.failures.outputs.test_run_url }}
+               - Build: ${{ steps.failures.outputs.build_run_url }}
+
+            2. Use `gh run view <run-id> --log-failed` to get detailed error logs
+
+            3. Fix ALL issues found:
+               - **Lint**: Remove unused imports/variables, fix formatting
+               - **Test**: Fix compilation errors, missing imports, wrong signatures
+               - **Coverage**: Add tests to meet 95% threshold
+               - **Build**: Fix dependency and compilation issues
+
+            4. Make sure ALL problems are fixed in one go
+
+            5. DO NOT commit or push - the workflow will handle git operations
+
+            **Important:**
+            - Fix all issues comprehensively
+            - Ensure code still compiles and tests pass
+            - Follow the repository's coding standards (see CLAUDE.md)
+            - Use test database and mocks as specified
+
+            This is attempt ${{ steps.iteration.outputs.next_attempt }} of 3, so be thorough.
+          additional_permissions: |
+            actions: read
+
+          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
+          # prompt: 'Update the pull request description to include a summary of changes.'
+
+          # Optional: Add claude_args to customize behavior and configuration
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://docs.claude.com/en/docs/claude-code/sdk#command-line for available options
+          claude_args: |
+            --allowed-tools "Read,Edit,Write,MultiEdit,Glob,Grep,Bash(go build),Bash(go test),Bash(go mod),Bash(make),Bash(make test),Bash(make build),Bash(make lint),Bash(make test-bdd),Bash(make validate),Bash(./bin/*),Bash(git status),Bash(git diff),Bash(git add),Bash(git commit),Bash(gh pr comment),Bash(gh pr checks),Bash(gh issue comment),Bash(gh api)"
+            --model claude-opus-4-1-20250805
+            --max-turns 20
+      - name: Commit and push fixes
+        if: steps.failures.outputs.has_failures == 'true'
+        run: |
+          # Check if there are any changes
+          if [[ -z $(git status --porcelain) ]]; then
+            echo "ℹ️ No changes made by Claude"
+            exit 0
+          fi
+
+          # Commit changes
+          git add -A
+          git commit -m "fix: auto-fix CI failures (attempt ${{ steps.iteration.outputs.next_attempt }}/3)
+
+          Fixed issues in: ${{ steps.failures.outputs.failures }}
+
+          🤖 Automatically fixed by Auto Fix on CI Failure workflow
+
+          Details:
+          - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - Triggered by: ${{ github.event.workflow_run.html_url }}
+          - PR: #${{ steps.pr.outputs.number }}"
+
+          # Push changes
+          echo "📤 Pushing fixes to branch..."
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ steps.pr.outputs.head_ref }}
+
+          echo "✅ Fixes committed and pushed"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR
+        if: steps.failures.outputs.has_failures == 'true'
+        run: |
+          gh pr comment ${{ steps.pr.outputs.number }} --body "🤖 **Auto-Fix Applied (Attempt ${{ steps.iteration.outputs.next_attempt }}/3)**
+
+          Analyzed and fixed issues in: ${{ steps.failures.outputs.failures }}
+
+          The CI will re-run automatically to validate these fixes.
+
+          [View auto-fix workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Final status
+        if: always()
+        run: |
+          if [[ "${{ steps.failures.outputs.has_failures }}" == "false" ]]; then
+            echo "✅ No failures detected - checks passed!"
+          elif [[ "${{ steps.iteration.outputs.max_attempts_reached }}" == "true" ]]; then
+            echo "⚠️ Max retry attempts reached - manual intervention required"
+          else
+            echo "✅ Auto-fix attempt ${{ steps.iteration.outputs.next_attempt }}/3 completed"
+          fi

@@ -1,0 +1,190 @@
+name: Auto Comment Claude on CI Failure
+
+# NOTE: For Claude Code Action to respond to @mentions, a GitHub PAT must be configured
+# as CLAUDE_PAT secret. Without it, comments will come from github-actions[bot] which
+# Claude Code Action ignores for security reasons. The workflow will still run but
+# Claude won't automatically respond. See: https://github.com/anthropics/claude-code-action/blob/main/docs/faq.md
+
+on:
+  workflow_run:
+    workflows: ["Go CI/CD"]
+    types: [completed]
+
+jobs:
+  comment-claude:
+    # Only run if the workflow failed and it was triggered by a pull request
+    if: |
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'pull_request'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      actions: read
+      checks: read
+
+    steps:
+      - name: Get PR number
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pulls = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`
+            });
+
+            if (pulls.data.length === 0) {
+              core.setFailed('No open PR found for this branch');
+              return;
+            }
+
+            const pr = pulls.data[0];
+            core.setOutput('number', pr.number);
+            console.log(`Found PR #${pr.number}`);
+
+      - name: Check iteration count
+        id: iteration
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CLAUDE_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.pr.outputs.number }}
+            });
+
+            // Count how many times we've auto-commented
+            const autoComments = comments.filter(c =>
+              c.body.includes('🤖 Auto-Fix Request') &&
+              c.user.login === 'github-actions[bot]'
+            );
+
+            const attemptCount = autoComments.length;
+            const nextAttempt = attemptCount + 1;
+
+            core.setOutput('attempt_count', attemptCount);
+            core.setOutput('next_attempt', nextAttempt);
+            core.setOutput('max_attempts_reached', nextAttempt > 3);
+
+            console.log(`Auto-fix attempt ${nextAttempt}/3`);
+
+      - name: Stop if max attempts reached
+        if: steps.iteration.outputs.max_attempts_reached == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CLAUDE_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.pr.outputs.number }},
+              body: `⚠️ **Auto-Fix Limit Reached**
+
+            The automatic fix workflow has attempted to fix CI failures 3 times without success.
+
+            **Next Steps:**
+            1. Review the previous auto-fix attempts in the comments
+            2. Manually investigate the remaining issues
+            3. Comment \`@claude\` with specific instructions if you want to retry
+
+            [View failed workflow run](${context.payload.workflow_run.html_url})`
+            });
+
+            core.setFailed('Max retry attempts (3) reached');
+
+      - name: Get failed checks
+        id: failures
+        uses: actions/github-script@v7
+        if: steps.iteration.outputs.max_attempts_reached == 'false'
+        with:
+          script: |
+            const prNumber = ${{ steps.pr.outputs.number }};
+
+            // Get check runs for the workflow
+            const { data: checkRuns } = await github.rest.checks.listForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.payload.workflow_run.head_sha
+            });
+
+            const failures = [];
+            const failureDetails = {};
+
+            for (const check of checkRuns.check_runs) {
+              if (check.conclusion === 'failure') {
+                failures.push(check.name);
+                failureDetails[check.name] = check.html_url;
+              }
+            }
+
+            if (failures.length === 0) {
+              console.log('No failures found - checks may have passed');
+              core.setOutput('has_failures', 'false');
+            } else {
+              console.log(`Found failures: ${failures.join(', ')}`);
+              core.setOutput('has_failures', 'true');
+              core.setOutput('failures', failures.join(', '));
+              core.setOutput('failure_urls', JSON.stringify(failureDetails));
+            }
+
+      - name: Post @claude comment
+        if: steps.failures.outputs.has_failures == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CLAUDE_PAT || secrets.GITHUB_TOKEN }}
+          script: |
+            const failures = '${{ steps.failures.outputs.failures }}';
+            const failureUrls = JSON.parse('${{ steps.failures.outputs.failure_urls }}');
+            const attempt = ${{ steps.iteration.outputs.next_attempt }};
+
+            let urlsList = '';
+            for (const [name, url] of Object.entries(failureUrls)) {
+              urlsList += `- **${name}**: ${url}\n`;
+            }
+
+            const body = `🤖 **Auto-Fix Request (Attempt ${attempt}/3)**
+
+            @claude The CI checks have failed. Please fix all issues:
+
+            **Failed Checks:**
+            ${urlsList}
+
+            **Instructions:**
+            1. Use \`gh run view\` to fetch detailed error logs from the failed checks
+            2. Analyze all errors and fix them comprehensively:
+               - **Lint failures**: Remove unused imports/variables, fix formatting, resolve type errors
+               - **Test failures**: Fix compilation errors, update signatures, add missing imports
+               - **Coverage failures**: Add tests to meet the 85% threshold
+               - **Build failures**: Fix dependency issues, resolve compilation errors
+            3. After fixing, commit and push your changes - this will automatically trigger CI again
+            4. Follow the coding standards in CLAUDE.md
+            5. Use test database and mocks as specified in project instructions
+
+            **Important:** Fix ALL issues in one comprehensive update so CI passes on the next run.
+
+            [Workflow run details](${context.payload.workflow_run.html_url})`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ steps.pr.outputs.number }},
+              body: body
+            });
+
+            console.log(`Posted @claude comment on PR #${{ steps.pr.outputs.number }}`);
+
+      - name: Final status
+        if: always()
+        run: |
+          if [[ "${{ steps.failures.outputs.has_failures }}" == "false" ]]; then
+            echo "✅ No failures detected - checks passed!"
+          elif [[ "${{ steps.iteration.outputs.max_attempts_reached }}" == "true" ]]; then
+            echo "⚠️ Max retry attempts reached - manual intervention required"
+          else
+            echo "✅ Posted @claude comment for attempt ${{ steps.iteration.outputs.next_attempt }}/3"
+          fi

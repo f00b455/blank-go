@@ -1,0 +1,67 @@
+{
+  "projectNumber": 4,
+  "projectTitle": "Product Development Board",
+  "owner": "f00b455",
+  "repo": "golang-template",
+  "projectUrl": "https://github.com/users/f00b455/projects/4",
+  "createdAt": "2025-10-01T20:34:18.246058Z",
+  "views": [
+    {
+      "name": "📥 Intake \u0026 Refinement",
+      "layout": "Board",
+      "description": "Track new items through initial refinement"
+    },
+    {
+      "name": "👤 PO Review Queue",
+      "layout": "Table",
+      "description": "Items awaiting Product Owner review"
+    },
+    {
+      "name": "📋 Product Backlog",
+      "layout": "Table",
+      "description": "Prioritized backlog ready for sprint planning"
+    },
+    {
+      "name": "🏃 Sprint Board",
+      "layout": "Board",
+      "description": "Active sprint work in progress"
+    },
+    {
+      "name": "✅ Acceptance \u0026 Release",
+      "layout": "Table",
+      "description": "Items in acceptance testing and final review"
+    },
+    {
+      "name": "🗓️ Roadmap",
+      "layout": "Roadmap",
+      "description": "Epic-level roadmap with target dates"
+    },
+    {
+      "name": "📊 Epic Progress Tracker",
+      "layout": "Table",
+      "description": "Track progress of epics and large initiatives"
+    }
+  ],
+  "statusField": {
+    "name": "Status",
+    "type": "SINGLE_SELECT",
+    "options": [
+      "🆕 New",
+      "💬 Clarification",
+      "🔄 Refinement",
+      "📝 Review Requested",
+      "❌ Changes Needed",
+      "✅ Review Accepted",
+      "📋 Backlog",
+      "🎯 Sprint Planned",
+      "🔖 Ready",
+      "🏗️ In Progress",
+      "👀 In Review",
+      "🚧 Blocked",
+      "🧪 Acceptance Testing",
+      "✔️ Acceptance Accepted",
+      "🔍 Final Review",
+      "✅ Done"
+    ]
+  }
+}

@@ -1,0 +1,130 @@
+name: Go CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number (optional - for manual trigger on specific PR branch)'
+        required: false
+        type: string
+
+env:
+  GO_VERSION: "1.23"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: false
+
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --no-config --timeout=5m
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: false
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Install Hugo for BDD tests
+      run: make install-hugo
+
+    - name: Build binaries for BDD tests
+      run: |
+        go build -o bin/api-server ./cmd/api
+        go build -o bin/cli-tool ./cmd/cli
+        go build -o bin/web-server ./cmd/web
+
+    - name: Run unit tests with coverage
+      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/... ./pkg/... ./features/...
+
+    - name: Check test coverage threshold
+      run: |
+        chmod +x scripts/check-coverage.sh
+        ./scripts/check-coverage.sh 85.0 coverage.out
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        token: ${{ secrets.CODECOV_TOKEN }}
+      if: always()
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+    - uses: actions/checkout@v4
+      id: checkout
+      continue-on-error: true
+
+    - name: Retry checkout if failed
+      if: steps.checkout.outcome == 'failure'
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: false
+      id: setup-go
+      continue-on-error: true
+
+    - name: Retry Go setup if failed
+      if: steps.setup-go.outcome == 'failure'
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: false
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Build API server
+      run: go build -o bin/api-server ./cmd/api
+
+    - name: Build CLI tool
+      run: go build -o bin/cli-tool ./cmd/cli
+
+    - name: Build Web server
+      run: go build -o bin/web-server ./cmd/web
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries
+        path: bin/
+      id: upload
+      continue-on-error: true
+
+    - name: Retry artifact upload if failed
+      if: steps.upload.outcome == 'failure'
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries
+        path: bin/
