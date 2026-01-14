@@ -1,8 +1,24 @@
-FROM gcr.io/distroless/static-debian12:nonroot
+# Build stage
+FROM golang:1.23-alpine AS builder
 
-COPY bin/api /app/api
+WORKDIR /build
 
-USER nonroot:nonroot
+# Copy go mod files first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build static binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-w -s" -o api ./cmd/api
+
+# Runtime stage - minimal image (~2MB)
+FROM scratch
+
+COPY --from=builder /build/api /api
+
 EXPOSE 3002
 
-ENTRYPOINT ["/app/api"]
+ENTRYPOINT ["/api"]
