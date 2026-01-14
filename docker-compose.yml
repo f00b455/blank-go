@@ -1,11 +1,36 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dax_user
+      POSTGRES_PASSWORD: dax_password
+      POSTGRES_DB: dax_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dax_user -d dax_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   api:
     build:
       context: .
       dockerfile: cmd/api/Dockerfile
     ports:
       - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       - PORT=3002
       - ENVIRONMENT=production
+      - DATABASE_URL=postgres://dax_user:dax_password@postgres:5432/dax_db?sslmode=disable
+      - GIN_MODE=release
     restart: unless-stopped
+
+volumes:
+  postgres_data:
