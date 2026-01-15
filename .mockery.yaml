@@ -1,0 +1,11 @@
+with-expecter: true
+dir: "mocks"
+all: true
+packages:
+  github.com/f00b455/blank-go/pkg/dax:
+    interfaces:
+      Repository:
+        config:
+          dir: "mocks"
+          filename: "mock_repository.go"
+          mockname: "MockRepository"
