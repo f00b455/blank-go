@@ -23,7 +23,7 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      actions: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,15 +35,55 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-          # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.claude.com/en/docs/claude-code/sdk#command-line for available options
           claude_args: |
-            --allowed-tools "Read,Edit,Write,MultiEdit,Glob,Grep,Bash(go build:*),Bash(go test:*),Bash(go mod:*),Bash(go get:*),Bash(go tool:*),Bash(make:*),Bash(./bin/*),Bash(mkdir:*),Bash(touch:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr comment:*),Bash(gh pr checks:*),Bash(gh pr view:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh api:*)"
+            --allowed-tools "Read,Edit,Write,MultiEdit,Glob,Grep,Bash(go build:*),Bash(go test:*),Bash(go mod:*),Bash(go get:*),Bash(go tool:*),Bash(make:*),Bash(./bin/*),Bash(mkdir:*),Bash(touch:*),Bash(cp:*),Bash(mv:*),Bash(rm:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh pr create:*),Bash(gh pr comment:*),Bash(gh pr checks:*),Bash(gh pr view:*),Bash(gh pr edit:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh api:*)"
             --model claude-sonnet-4-5-20250929
             --max-turns 100
+
+      # Auto-create PR if Claude pushed to a new branch (for issues only)
+      - name: Create PR if branch was created
+        if: github.event_name == 'issues'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the branch that Claude created
+          ISSUE_NUMBER=${{ github.event.issue.number }}
+          BRANCH_NAME=$(git branch -r --list "origin/claude/issue-${ISSUE_NUMBER}-*" | head -1 | sed 's|origin/||' | xargs)
+
+          if [ -z "$BRANCH_NAME" ]; then
+            echo "No Claude branch found for issue #${ISSUE_NUMBER}"
+            exit 0
+          fi
+
+          echo "Found branch: $BRANCH_NAME"
+
+          # Check if PR already exists for this branch
+          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number')
+
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists for branch $BRANCH_NAME"
+            exit 0
+          fi
+
+          # Create PR
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+
+          gh pr create \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "feat: ${ISSUE_TITLE}" \
+            --body "## Summary
+
+          Implements #${ISSUE_NUMBER}
+
+          See issue #${ISSUE_NUMBER} for details.
+
+          ---
+
+          Closes #${ISSUE_NUMBER}
+
+          🤖 Generated with [Claude Code](https://claude.ai/code)"
+
+          echo "✅ PR created for branch $BRANCH_NAME"
