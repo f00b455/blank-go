@@ -14,6 +14,7 @@ import (
 	"github.com/f00b455/blank-go/internal/handlers"
 	"github.com/f00b455/blank-go/pkg/dax"
 	"github.com/f00b455/blank-go/pkg/task"
+	"github.com/f00b455/blank-go/pkg/weather"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -105,6 +106,15 @@ func setupRouter(cfg *config.Config, db interface{}) *gin.Engine {
 				daxGroup.GET("/metrics", daxHandler.GetMetrics)
 			}
 		}
+
+		// Weather routes
+		weatherClient := weather.NewClient()
+		weatherService := weather.NewService(weatherClient)
+		weatherHandler := handlers.NewWeatherHandler(weatherService)
+
+		api.GET("/weather", weatherHandler.GetCurrentWeather)
+		api.GET("/weather/forecast", weatherHandler.GetForecast)
+		api.GET("/weather/cities/:city", weatherHandler.GetWeatherByCity)
 	}
 
 	return router

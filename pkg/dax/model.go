@@ -8,16 +8,16 @@ import (
 
 // DAXRecord represents a financial data record for a DAX company
 type DAXRecord struct {
-	ID         uuid.UUID  `json:"id" gorm:"type:uuid;primary_key"`
-	Company    string     `json:"company" gorm:"type:varchar(255);not null"`
-	Ticker     string     `json:"ticker" gorm:"type:varchar(10);not null;index:idx_ticker_year"`
-	ReportType string     `json:"report_type" gorm:"type:varchar(50)"`
-	Metric     string     `json:"metric" gorm:"type:varchar(100);not null"`
-	Year       int        `json:"year" gorm:"not null;index:idx_ticker_year"`
-	Value      *float64   `json:"value" gorm:"type:decimal(20,2)"`
-	Currency   string     `json:"currency" gorm:"type:varchar(3);default:'EUR'"`
-	CreatedAt  time.Time  `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt  time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
+	ID         uuid.UUID `json:"id" gorm:"type:uuid;primary_key"`
+	Company    string    `json:"company" gorm:"type:varchar(255);not null"`
+	Ticker     string    `json:"ticker" gorm:"type:varchar(10);not null;index:idx_ticker_year"`
+	ReportType string    `json:"report_type" gorm:"type:varchar(50)"`
+	Metric     string    `json:"metric" gorm:"type:varchar(100);not null"`
+	Year       int       `json:"year" gorm:"not null;index:idx_ticker_year"`
+	Value      *float64  `json:"value" gorm:"type:decimal(20,2)"`
+	Currency   string    `json:"currency" gorm:"type:varchar(3);default:'EUR'"`
+	CreatedAt  time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt  time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 // TableName sets the table name for GORM

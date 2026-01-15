@@ -30,15 +30,15 @@ const (
 
 // Task represents a todo item
 type Task struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description,omitempty"`
-	Status      Status    `json:"status"`
-	Priority    Priority  `json:"priority"`
+	ID          string     `json:"id"`
+	Title       string     `json:"title"`
+	Description string     `json:"description,omitempty"`
+	Status      Status     `json:"status"`
+	Priority    Priority   `json:"priority"`
 	DueDate     *time.Time `json:"due_date,omitempty"`
-	Tags        []string  `json:"tags,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Tags        []string   `json:"tags,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // IsValidStatus checks if a status string is valid
