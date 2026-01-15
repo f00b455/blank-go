@@ -50,3 +50,18 @@ func TestWeatherFeatures(t *testing.T) {
 		t.Fatal("non-zero status returned, failed to run Weather feature tests")
 	}
 }
+
+func TestHealthFeatures(t *testing.T) {
+	suite := godog.TestSuite{
+		ScenarioInitializer: InitializeHealthScenario,
+		Options: &godog.Options{
+			Format:   "pretty",
+			Paths:    []string{"health-detailed.feature"},
+			TestingT: t,
+		},
+	}
+
+	if suite.Run() != 0 {
+		t.Fatal("non-zero status returned, failed to run Health feature tests")
+	}
+}
