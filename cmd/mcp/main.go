@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/f00b455/blank-go/internal/version"
 )
 
 // JSON-RPC structures
@@ -141,7 +143,9 @@ func fetchWeather(city string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("geocoding failed: %w", err)
 	}
-	defer geoResp.Body.Close()
+	defer func() {
+		_ = geoResp.Body.Close()
+	}()
 
 	var geoData GeocodingResponse
 	if err := json.NewDecoder(geoResp.Body).Decode(&geoData); err != nil {
@@ -164,7 +168,9 @@ func fetchWeather(city string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("weather fetch failed: %w", err)
 	}
-	defer weatherResp.Body.Close()
+	defer func() {
+		_ = weatherResp.Body.Close()
+	}()
 
 	var weatherData OpenMeteoResponse
 	if err := json.NewDecoder(weatherResp.Body).Decode(&weatherData); err != nil {
@@ -205,7 +211,7 @@ func handleRequest(req JSONRPCRequest) JSONRPCResponse {
 				ProtocolVersion: "2024-11-05",
 				ServerInfo: ServerInfo{
 					Name:    "weather-mcp",
-					Version: "1.0.0",
+					Version: version.Version,
 				},
 				Capabilities: map[string]any{
 					"tools": map[string]any{},

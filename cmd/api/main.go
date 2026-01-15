@@ -20,6 +20,7 @@ import (
 )
 
 func main() {
+	startTime := time.Now()
 	cfg := config.Load()
 
 	if cfg.Environment == "production" {
@@ -37,7 +38,7 @@ func main() {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
-	router := setupRouter(cfg, db)
+	router := setupRouter(cfg, db, startTime)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -70,7 +71,7 @@ func main() {
 	log.Println("Server exited")
 }
 
-func setupRouter(cfg *config.Config, db interface{}) *gin.Engine {
+func setupRouter(cfg *config.Config, db interface{}, startTime time.Time) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
@@ -85,6 +86,7 @@ func setupRouter(cfg *config.Config, db interface{}) *gin.Engine {
 	api := router.Group("/api/v1")
 	{
 		api.GET("/ping", handlers.Ping)
+		api.GET("/health/detailed", handlers.DetailedHealthCheck(startTime))
 
 		// Task routes
 		api.POST("/tasks", taskHandler.CreateTask)
