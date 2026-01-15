@@ -87,3 +87,8 @@ jobs:
           🤖 Generated with [Claude Code](https://claude.ai/code)"
 
           echo "✅ PR created for branch $BRANCH_NAME"
+
+          # Trigger CI manually (GitHub Actions created by other Actions don't trigger workflows)
+          echo "🔄 Triggering CI workflow..."
+          gh workflow run "Go CI/CD" --ref "$BRANCH_NAME"
+          echo "✅ CI workflow triggered for $BRANCH_NAME"
