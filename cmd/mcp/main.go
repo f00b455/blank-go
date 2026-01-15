@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/f00b455/blank-go/internal/version"
 )
 
 // JSON-RPC structures
@@ -209,7 +211,7 @@ func handleRequest(req JSONRPCRequest) JSONRPCResponse {
 				ProtocolVersion: "2024-11-05",
 				ServerInfo: ServerInfo{
 					Name:    "weather-mcp",
-					Version: "1.0.0",
+					Version: version.Version,
 				},
 				Capabilities: map[string]any{
 					"tools": map[string]any{},
