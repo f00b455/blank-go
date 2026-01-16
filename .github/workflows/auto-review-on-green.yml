@@ -83,12 +83,14 @@ jobs:
           prompt: |
             🎉 All CI checks have passed! Please review this pull request.
 
+            **IMPORTANT: CI has already verified tests pass and linting is clean. Do NOT run make, go test, or linting commands - focus on code review only.**
+
             **Review Focus:**
             1. **Code Quality**: Check for clean code principles, proper naming, and structure
             2. **Best Practices**: Verify adherence to Go best practices and project conventions
             3. **Potential Bugs**: Look for edge cases, error handling issues, or logic errors
             4. **Security**: Check for security vulnerabilities or unsafe practices
-            5. **Test Coverage**: Verify tests are comprehensive and meaningful
+            5. **Test Coverage**: Review test files for comprehensiveness
             6. **Documentation**: Ensure code is well-documented where needed
 
             **Guidelines:**
@@ -96,6 +98,8 @@ jobs:
             - Be constructive and helpful in feedback
             - Focus on significant issues, not minor nitpicks
             - Consider the context: small fixes need lighter review than major features
+            - Use `gh pr diff ${{ steps.pr.outputs.number }}` to see the changes
+            - Use Read tool to examine files in detail
 
             **Review Format:**
             At the end of your review, clearly state one of:
@@ -103,11 +107,12 @@ jobs:
             - "💭 **COMMENT** - Suggestions for improvement (non-blocking)" if minor issues
             - "🔧 **CHANGES REQUESTED** - Issues found that should be fixed" if there are problems
 
-            Use `gh pr comment` to post your review on PR #${{ steps.pr.outputs.number }}.
+            Post your review using: `gh pr comment ${{ steps.pr.outputs.number }} --body "YOUR REVIEW HERE"`
+            Keep the review concise and use simple markdown without complex escaping.
 
           claude_args: |
-            --allowed-tools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(git log:*),Bash(make lint:*)"
-            --max-turns 30
+            --allowed-tools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*),Bash(gh pr checks:*),Bash(gh api:*),Bash(git log:*),Bash(git diff:*)"
+            --max-turns 50
 
       - name: Log completion
         if: always()
