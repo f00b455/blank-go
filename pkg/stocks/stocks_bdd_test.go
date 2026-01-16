@@ -159,7 +159,7 @@ func (ctx *stocksFeatureContext) iRequestStockSummaryForTicker(ticker string) er
 	ctx.router.ServeHTTP(ctx.response, req)
 
 	if ctx.response.Code == http.StatusOK {
-		_ = json.Unmarshal([]byte(ctx.response.Body.String()), &ctx.responseBody)
+		_ = json.Unmarshal(ctx.response.Body.Bytes(), &ctx.responseBody)
 	}
 
 	return nil
@@ -170,7 +170,7 @@ func (ctx *stocksFeatureContext) iRequestBatchStockSummaryForTickers(tickers str
 	ctx.response = httptest.NewRecorder()
 	ctx.router.ServeHTTP(ctx.response, req)
 
-	_ = json.Unmarshal([]byte(ctx.response.Body.String()), &ctx.responseBody)
+	_ = json.Unmarshal(ctx.response.Body.Bytes(), &ctx.responseBody)
 
 	return nil
 }
@@ -283,7 +283,7 @@ func (ctx *stocksFeatureContext) theDateShouldBeInFormat(format string) error {
 
 func (ctx *stocksFeatureContext) theErrorMessageShouldIndicate(message string) error {
 	var errorResp map[string]interface{}
-	_ = json.Unmarshal([]byte(ctx.response.Body.String()), &errorResp)
+	_ = json.Unmarshal(ctx.response.Body.Bytes(), &errorResp)
 
 	if errorMsg, ok := errorResp["error"].(string); !ok || !strings.Contains(errorMsg, message) {
 		return fmt.Errorf("error message should contain '%s', got response: %s", message, ctx.response.Body.String())
