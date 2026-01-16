@@ -1,0 +1,236 @@
+# golangci-lint v2 configuration
+# Based on Clean Code principles defined in CLAUDE.md
+#
+# Run: make lint or ./bin/golangci-lint run
+# Fix: make lint-fix or ./bin/golangci-lint run --fix
+#
+# Note: Some limits are relaxed for existing code. TODOs mark areas
+# to tighten as code is refactored to meet CLAUDE.md standards.
+
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  tests: true
+  relative-path-mode: gomod
+
+linters:
+  # Use standard linters as base, then customize
+  default: standard
+
+  enable:
+    # Complexity & maintainability (CLAUDE.md requirements)
+    - gocyclo           # Cyclomatic complexity
+    - gocognit          # Cognitive complexity
+    - funlen            # Function length
+    - lll               # Line length limit
+
+    # Code quality
+    - goconst           # Find repeated strings (no magic numbers)
+    - unconvert         # Remove unnecessary type conversions
+    - dupl              # Code clone detection
+
+    # Error handling (CLAUDE.md: All errors must be handled)
+    - nilerr            # Check for err != nil but return nil
+    - errname           # Check error naming conventions
+
+    # Security
+    - gosec             # Security checker
+
+    # Best practices
+    - misspell          # Find commonly misspelled words
+    - whitespace        # Check for unnecessary whitespace
+    - revive            # Fast, configurable linter
+
+  disable:
+    # Temporarily disabled - enable progressively as code is cleaned up
+    - unparam           # Too many false positives in existing code
+    - prealloc          # Optimization suggestions, not critical
+    - bodyclose         # Requires refactoring in weather client
+
+  settings:
+    # Cyclomatic complexity: 15 max (relaxed, CLAUDE.md target: 10)
+    # TODO: Reduce to 10 as code is refactored
+    gocyclo:
+      min-complexity: 15
+
+    # Cognitive complexity: 15 max (relaxed, CLAUDE.md target: 10)
+    # TODO: Reduce to 10 as code is refactored
+    gocognit:
+      min-complexity: 15
+
+    # Function length: 110 lines max (relaxed, CLAUDE.md target: 60)
+    # TODO: Reduce to 60 as code is refactored
+    funlen:
+      lines: 110
+      statements: 60
+      ignore-comments: true
+
+    # Line length: 180 chars (relaxed, CLAUDE.md target: 120)
+    lll:
+      line-length: 180
+      tab-width: 4
+
+    # Code duplication detection
+    dupl:
+      threshold: 100
+
+    # Security checks
+    gosec:
+      excludes:
+        - G104  # Audit errors not checked (handled by errcheck)
+
+    # Magic numbers/strings (CLAUDE.md: No magic numbers)
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+
+    # Misspell settings
+    misspell:
+      locale: US
+
+    # Revive linter settings
+    revive:
+      rules:
+        # Naming conventions
+        - name: var-naming
+          severity: warning
+        - name: package-comments
+          disabled: true
+        - name: exported
+          disabled: true  # TODO: Enable when all exports have comments
+        # Error handling
+        - name: error-return
+          severity: error
+        - name: error-strings
+          severity: warning
+        # Clean code principles
+        - name: blank-imports
+          severity: warning
+        - name: context-as-argument
+          severity: warning
+        - name: context-keys-type
+          severity: warning
+        - name: dot-imports
+          severity: warning
+        - name: empty-block
+          severity: warning
+        - name: error-naming
+          severity: warning
+        - name: increment-decrement
+          severity: warning
+        - name: indent-error-flow
+          severity: warning
+        - name: range
+          severity: warning
+        - name: receiver-naming
+          severity: warning
+        - name: redefines-builtin-id
+          severity: warning
+        - name: superfluous-else
+          severity: warning
+        - name: time-naming
+          severity: warning
+        - name: unexported-return
+          severity: warning
+        - name: unreachable-code
+          severity: warning
+        - name: unused-parameter
+          disabled: true  # TODO: Enable when unused params are cleaned up
+        - name: unused-receiver
+          disabled: true  # TODO: Enable when unused receivers are cleaned up
+
+    # Error check settings
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+      exclude-functions:
+        - io.Copy
+        - io.WriterTo.WriteTo
+
+  exclusions:
+    # Exclude generated files
+    generated: strict
+
+    # Exclude rules for specific paths
+    rules:
+      # Test files - relaxed rules
+      - path: _test\.go
+        linters:
+          - funlen
+          - dupl
+          - gocognit
+          - goconst
+          - errcheck
+          - lll
+
+      # Generated mocks
+      - path: mocks/
+        linters:
+          - funlen
+          - dupl
+          - gocyclo
+          - gocognit
+          - goconst
+          - unused
+          - unparam
+
+      # Docs package
+      - path: docs/
+        linters:
+          - funlen
+          - lll
+
+      # Feature test files
+      - path: features/
+        linters:
+          - lll
+          - funlen
+          - errcheck
+
+      # CMD packages (main functions, CLI tools)
+      - path: cmd/
+        linters:
+          - errcheck
+          - gosec
+          - lll
+          - gocognit
+          - gocyclo
+
+      # pkg/weather - acceptable error handling patterns
+      - path: pkg/weather/
+        linters:
+          - errcheck
+
+      # pkg/shared - package naming
+      - path: pkg/shared/
+        linters:
+          - revive
+
+    paths:
+      - vendor
+      - .git
+      - bin
+
+# Import organization (CLAUDE.md: Standard library, third-party, local imports)
+formatters:
+  enable:
+    - goimports
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/f00b455/blank-go
+
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 10
+
+output:
+  formats:
+    text:
+      path: stdout
+  sort-order:
+    - file
+    - linter

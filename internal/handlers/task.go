@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/f00b455/blank-go/pkg/task"
 	"github.com/gin-gonic/gin"
+
+	"github.com/f00b455/blank-go/pkg/task"
 )
 
 // TaskHandler handles HTTP requests for task operations

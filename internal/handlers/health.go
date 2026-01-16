@@ -5,8 +5,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/f00b455/blank-go/internal/version"
 	"github.com/gin-gonic/gin"
+
+	"github.com/f00b455/blank-go/internal/version"
 )
 
 const (

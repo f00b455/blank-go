@@ -9,9 +9,10 @@ import (
 	"strings"
 
 	"github.com/cucumber/godog"
+	"github.com/gin-gonic/gin"
+
 	"github.com/f00b455/blank-go/internal/handlers"
 	"github.com/f00b455/blank-go/pkg/weather"
-	"github.com/gin-gonic/gin"
 )
 
 type weatherFeatureContext struct {

@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/f00b455/blank-go/internal/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/f00b455/blank-go/internal/config"
 )
 
 // Connect establishes a connection to the PostgreSQL database

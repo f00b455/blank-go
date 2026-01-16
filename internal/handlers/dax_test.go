@@ -9,10 +9,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/f00b455/blank-go/pkg/dax"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/f00b455/blank-go/pkg/dax"
 )
 
 func TestMain(m *testing.M) {

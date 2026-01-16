@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+	"github.com/gin-gonic/gin"
+
 	"github.com/f00b455/blank-go/internal/handlers"
 	"github.com/f00b455/blank-go/pkg/task"
-	"github.com/gin-gonic/gin"
 )
 
 type taskFeatureContext struct {

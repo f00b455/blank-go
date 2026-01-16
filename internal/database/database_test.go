@@ -3,8 +3,9 @@ package database
 import (
 	"testing"
 
-	"github.com/f00b455/blank-go/internal/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/f00b455/blank-go/internal/config"
 )
 
 func TestConnect(t *testing.T) {

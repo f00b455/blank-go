@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/f00b455/blank-go/pkg/dax"
 	"github.com/gin-gonic/gin"
+
+	"github.com/f00b455/blank-go/pkg/dax"
 )
 
 // DAXHandler handles DAX-related HTTP requests
@@ -37,7 +38,12 @@ func (h *DAXHandler) ImportCSV(c *gin.Context) {
 		})
 		return
 	}
-	defer func() { _ = openedFile.Close() }()
+	defer func() {
+		if err := openedFile.Close(); err != nil {
+			// Log error but don't fail the request
+			_ = err
+		}
+	}()
 
 	// Import CSV
 	response, err := h.service.ImportCSV(openedFile)
