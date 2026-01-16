@@ -6,6 +6,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/f00b455/blank-go/pkg/dax"
@@ -14,11 +15,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupDAXHandler() (*DAXHandler, *dax.Service) {
+func TestMain(m *testing.M) {
+	gin.SetMode(gin.TestMode)
+	os.Exit(m.Run())
+}
+
+func float64Ptr(f float64) *float64 {
+	return &f
+}
+
+func setupDAXHandler() (*DAXHandler, dax.Repository) {
 	repo := dax.NewInMemoryRepository()
 	service := dax.NewService(repo)
 	handler := NewDAXHandler(service)
-	return handler, service
+	return handler, repo
 }
 
 func createMultipartRequest(t *testing.T, csvContent string) (*http.Request, *bytes.Buffer) {
@@ -110,15 +120,12 @@ Siemens AG,SIE,income,EBITDA,invalid,15859000000.0,EUR`
 }
 
 func TestDAXHandler_GetAll_Success(t *testing.T) {
-	repo := dax.NewInMemoryRepository()
-	service := dax.NewService(repo)
-	handler := NewDAXHandler(service)
+	handler, repo := setupDAXHandler()
 
 	// Insert test data
-	val1, val2 := 1000.0, 2000.0
 	records := []dax.DAXRecord{
-		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: &val1, Currency: "EUR"},
-		{Company: "SAP SE", Ticker: "SAP", ReportType: "income", Metric: "Revenue", Year: 2025, Value: &val2, Currency: "EUR"},
+		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: float64Ptr(1000.0), Currency: "EUR"},
+		{Company: "SAP SE", Ticker: "SAP", ReportType: "income", Metric: "Revenue", Year: 2025, Value: float64Ptr(2000.0), Currency: "EUR"},
 	}
 	err := repo.BulkUpsert(records)
 	require.NoError(t, err)
@@ -136,14 +143,11 @@ func TestDAXHandler_GetAll_Success(t *testing.T) {
 }
 
 func TestDAXHandler_GetAll_DefaultPagination(t *testing.T) {
-	repo := dax.NewInMemoryRepository()
-	service := dax.NewService(repo)
-	handler := NewDAXHandler(service)
+	handler, repo := setupDAXHandler()
 
 	// Insert test data
-	val := 100.0
 	records := []dax.DAXRecord{
-		{Company: "Test", Ticker: "TST", ReportType: "income", Metric: "Revenue", Year: 2025, Value: &val, Currency: "EUR"},
+		{Company: "Test", Ticker: "TST", ReportType: "income", Metric: "Revenue", Year: 2025, Value: float64Ptr(100.0), Currency: "EUR"},
 	}
 	err := repo.BulkUpsert(records)
 	require.NoError(t, err)
@@ -158,15 +162,12 @@ func TestDAXHandler_GetAll_DefaultPagination(t *testing.T) {
 }
 
 func TestDAXHandler_GetByFilters_ByTicker(t *testing.T) {
-	repo := dax.NewInMemoryRepository()
-	service := dax.NewService(repo)
-	handler := NewDAXHandler(service)
+	handler, repo := setupDAXHandler()
 
 	// Insert test data
-	val1, val2 := 1000.0, 2000.0
 	records := []dax.DAXRecord{
-		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: &val1, Currency: "EUR"},
-		{Company: "SAP SE", Ticker: "SAP", ReportType: "income", Metric: "Revenue", Year: 2025, Value: &val2, Currency: "EUR"},
+		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: float64Ptr(1000.0), Currency: "EUR"},
+		{Company: "SAP SE", Ticker: "SAP", ReportType: "income", Metric: "Revenue", Year: 2025, Value: float64Ptr(2000.0), Currency: "EUR"},
 	}
 	err := repo.BulkUpsert(records)
 	require.NoError(t, err)
@@ -183,15 +184,12 @@ func TestDAXHandler_GetByFilters_ByTicker(t *testing.T) {
 }
 
 func TestDAXHandler_GetByFilters_ByYear(t *testing.T) {
-	repo := dax.NewInMemoryRepository()
-	service := dax.NewService(repo)
-	handler := NewDAXHandler(service)
+	handler, repo := setupDAXHandler()
 
 	// Insert test data
-	val1, val2 := 1000.0, 900.0
 	records := []dax.DAXRecord{
-		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: &val1, Currency: "EUR"},
-		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2024, Value: &val2, Currency: "EUR"},
+		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: float64Ptr(1000.0), Currency: "EUR"},
+		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2024, Value: float64Ptr(900.0), Currency: "EUR"},
 	}
 	err := repo.BulkUpsert(records)
 	require.NoError(t, err)
@@ -207,16 +205,13 @@ func TestDAXHandler_GetByFilters_ByYear(t *testing.T) {
 }
 
 func TestDAXHandler_GetByFilters_ByTickerAndYear(t *testing.T) {
-	repo := dax.NewInMemoryRepository()
-	service := dax.NewService(repo)
-	handler := NewDAXHandler(service)
+	handler, repo := setupDAXHandler()
 
 	// Insert test data
-	val1, val2, val3 := 1000.0, 900.0, 2000.0
 	records := []dax.DAXRecord{
-		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: &val1, Currency: "EUR"},
-		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2024, Value: &val2, Currency: "EUR"},
-		{Company: "SAP SE", Ticker: "SAP", ReportType: "income", Metric: "Revenue", Year: 2025, Value: &val3, Currency: "EUR"},
+		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: float64Ptr(1000.0), Currency: "EUR"},
+		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2024, Value: float64Ptr(900.0), Currency: "EUR"},
+		{Company: "SAP SE", Ticker: "SAP", ReportType: "income", Metric: "Revenue", Year: 2025, Value: float64Ptr(2000.0), Currency: "EUR"},
 	}
 	err := repo.BulkUpsert(records)
 	require.NoError(t, err)
@@ -246,15 +241,12 @@ func TestDAXHandler_GetByFilters_InvalidYear(t *testing.T) {
 }
 
 func TestDAXHandler_GetMetrics_Success(t *testing.T) {
-	repo := dax.NewInMemoryRepository()
-	service := dax.NewService(repo)
-	handler := NewDAXHandler(service)
+	handler, repo := setupDAXHandler()
 
 	// Insert test data
-	val1, val2 := 1000.0, 5000.0
 	records := []dax.DAXRecord{
-		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: &val1, Currency: "EUR"},
-		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "Revenue", Year: 2025, Value: &val2, Currency: "EUR"},
+		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "EBITDA", Year: 2025, Value: float64Ptr(1000.0), Currency: "EUR"},
+		{Company: "Siemens AG", Ticker: "SIE", ReportType: "income", Metric: "Revenue", Year: 2025, Value: float64Ptr(5000.0), Currency: "EUR"},
 	}
 	err := repo.BulkUpsert(records)
 	require.NoError(t, err)
@@ -345,40 +337,19 @@ func TestParseIntQuery(t *testing.T) {
 	}
 }
 
-func TestDAXHandler_GetAll_ServiceError(t *testing.T) {
-	repo := dax.NewInMemoryRepository()
-	service := dax.NewService(repo)
-	handler := NewDAXHandler(service)
-
-	// Force an error by using a closed/invalid repository state
-	// Since we're using in-memory repo, we'll simulate by calling with empty repo
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("GET", "/api/v1/dax", nil)
-
-	handler.GetAll(c)
-
-	// In-memory repo always succeeds, so we get 200
-	// For a real error test, we'd need a mock that returns errors
-	assert.Equal(t, http.StatusOK, w.Code)
-}
-
 func TestDAXHandler_GetByFilters_WithPagination(t *testing.T) {
-	repo := dax.NewInMemoryRepository()
-	service := dax.NewService(repo)
-	handler := NewDAXHandler(service)
+	handler, repo := setupDAXHandler()
 
 	// Insert test data
 	records := make([]dax.DAXRecord, 15)
 	for i := 0; i < 15; i++ {
-		val := float64(i * 100)
 		records[i] = dax.DAXRecord{
 			Company:    "Test",
 			Ticker:     "TST",
 			ReportType: "income",
 			Metric:     "Revenue",
 			Year:       2025,
-			Value:      &val,
+			Value:      float64Ptr(float64(i * 100)),
 			Currency:   "EUR",
 		}
 	}
