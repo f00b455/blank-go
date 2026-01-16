@@ -59,12 +59,15 @@ jobs:
         go build -o bin/cli-tool ./cmd/cli
 
     - name: Run unit tests with coverage
-      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./internal/... ./pkg/... ./features/...
+      run: |
+        # Run tests on all packages except mocks directories
+        go list ./internal/... ./pkg/... ./features/... | grep -v '/mocks$' | xargs go test -v -race -coverprofile=coverage.out -covermode=atomic
 
     - name: Check test coverage threshold
       run: |
         chmod +x scripts/check-coverage.sh
-        ./scripts/check-coverage.sh 0.0 coverage.out
+        # Temporarily set to 50% while Issue #15 increases coverage to 90%
+        ./scripts/check-coverage.sh 50.0 coverage.out
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4

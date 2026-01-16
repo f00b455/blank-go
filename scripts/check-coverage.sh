@@ -3,7 +3,7 @@
 # Usage: ./scripts/check-coverage.sh <threshold> <coverage_file>
 # Example: ./scripts/check-coverage.sh 80.0 coverage.out
 
-THRESHOLD=${1:-0.0}
+THRESHOLD=${1:-90.0}
 COVERAGE_FILE=${2:-coverage.out}
 
 if [ ! -f "$COVERAGE_FILE" ]; then

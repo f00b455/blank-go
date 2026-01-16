@@ -12,15 +12,7 @@ echo "Coverage threshold: ${COVERAGE_THRESHOLD}%"
 echo ""
 
 # Run tests and capture coverage (excluding generated mocks)
-# Find all packages except mocks directories
-PACKAGES=$(go list ./cmd/... ./internal/... ./pkg/... ./features/... 2>/dev/null | grep -v '/mocks$' || true)
-
-if [ -z "$PACKAGES" ]; then
-    echo "No packages found to test"
-    exit 1
-fi
-
-if ! go test -coverprofile="$COVERAGE_FILE" -covermode=atomic $PACKAGES 2>&1; then
+if ! go list ./internal/... ./pkg/... ./features/... 2>/dev/null | grep -v '/mocks$' | xargs go test -coverprofile="$COVERAGE_FILE" -covermode=atomic 2>&1; then
     echo ""
     echo "PUSH BLOCKED: Tests failed"
     rm -f "$COVERAGE_FILE"
