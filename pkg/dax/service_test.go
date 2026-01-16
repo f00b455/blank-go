@@ -163,3 +163,156 @@ func TestGetMetrics_EmptyTicker(t *testing.T) {
 	assert.Nil(t, response)
 	assert.Contains(t, err.Error(), "ticker is required")
 }
+
+func TestGetMetrics_NilMetrics(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	// Return empty slice (not nil) to satisfy interface
+	mockRepo.On("GetMetrics", "TST").Return([]string{}, nil)
+
+	response, err := service.GetMetrics("TST")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, "TST", response.Ticker)
+	assert.NotNil(t, response.Metrics)
+	assert.Equal(t, 0, len(response.Metrics))
+	mockRepo.AssertExpectations(t)
+}
+
+func TestImportCSV_EmptyCSV(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	csvContent := `company,ticker,report_type,metric,year,value,currency`
+
+	reader := bytes.NewBufferString(csvContent)
+	response, err := service.ImportCSV(reader)
+
+	assert.Error(t, err)
+	assert.Nil(t, response)
+	assert.Contains(t, err.Error(), "no records found in CSV")
+}
+
+func TestImportCSV_InvalidValue(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	csvContent := `company,ticker,report_type,metric,year,value,currency
+Siemens AG,SIE,income,EBITDA,2025,invalid_value,EUR`
+
+	reader := bytes.NewBufferString(csvContent)
+	response, err := service.ImportCSV(reader)
+
+	assert.Error(t, err)
+	assert.Nil(t, response)
+	assert.Contains(t, err.Error(), "invalid value")
+}
+
+func TestImportCSV_InsufficientColumns(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	csvContent := `company,ticker,report_type,metric,year,value,currency
+Siemens AG,SIE,income`
+
+	reader := bytes.NewBufferString(csvContent)
+	response, err := service.ImportCSV(reader)
+
+	assert.Error(t, err)
+	assert.Nil(t, response)
+	// CSV reader returns "wrong number of fields" error
+	assert.Contains(t, err.Error(), "wrong number of fields")
+}
+
+func TestGetAll_DefaultPagination(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	expectedRecords := []DAXRecord{
+		{Ticker: "SIE", Year: 2025},
+	}
+
+	// When page < 1, should default to 1
+	// When limit < 1, should default to 10
+	mockRepo.On("FindAll", 1, 10).Return(expectedRecords, 1, nil)
+
+	response, err := service.GetAll(0, 0)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetAll_LimitTooHigh(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	expectedRecords := []DAXRecord{
+		{Ticker: "SIE", Year: 2025},
+	}
+
+	// When limit > 100, should cap at 10 (default)
+	mockRepo.On("FindAll", 1, 10).Return(expectedRecords, 1, nil)
+
+	response, err := service.GetAll(1, 150)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetByFilters_DefaultPagination(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	expectedRecords := []DAXRecord{
+		{Ticker: "SIE", Year: 2025},
+	}
+
+	mockRepo.On("FindByFilters", "", (*int)(nil), 1, 10).
+		Return(expectedRecords, 1, nil)
+
+	response, err := service.GetByFilters("", nil, 0, -1)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetByFilters_OnlyTicker(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	expectedRecords := []DAXRecord{
+		{Ticker: "SIE", Year: 2025},
+	}
+
+	mockRepo.On("FindByFilters", "SIE", (*int)(nil), 1, 10).
+		Return(expectedRecords, 1, nil)
+
+	response, err := service.GetByFilters("SIE", nil, 1, 10)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestGetAll_TotalPagesCalculation(t *testing.T) {
+	mockRepo := new(MockRepository)
+	service := NewService(mockRepo)
+
+	expectedRecords := []DAXRecord{
+		{Ticker: "SIE", Year: 2025},
+	}
+
+	mockRepo.On("FindAll", 1, 3).Return(expectedRecords, 10, nil)
+
+	response, err := service.GetAll(1, 3)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, response)
+	assert.Equal(t, 4, response.Pagination.TotalPages) // 10 / 3 = 4 pages
+	mockRepo.AssertExpectations(t)
+}
