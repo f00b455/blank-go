@@ -140,13 +140,13 @@ test-cover: deps
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	$(GOCMD) tool cover -func=coverage.out
 
-# Run tests with coverage and validate threshold (90% target, 50% temp while improving)
+# Run tests with coverage and validate threshold (90% target achieved)
 test-coverage-check: deps
 	@echo "Running tests with coverage validation..."
 	@# Exclude mocks from coverage calculation
 	@go list ./internal/... ./pkg/... ./features/... | grep -v '/mocks$$' | xargs $(GOTEST) -v -race -coverprofile=coverage.out -covermode=atomic
 	@chmod +x scripts/check-coverage.sh
-	@./scripts/check-coverage.sh 50.0 coverage.out
+	@./scripts/check-coverage.sh 90.0 coverage.out
 
 # Auto-fix linting issues where possible
 lint-fix: deps
