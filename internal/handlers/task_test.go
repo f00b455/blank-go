@@ -419,6 +419,13 @@ func TestParseFilterOptions(t *testing.T) {
 		expectStatusSet   bool
 		expectedStatusVal string
 		expectedLimit     int
+		expectedOffset    int
+		expectPrioritySet bool
+		expectedPriority  string
+		expectTagSet      bool
+		expectedTag       string
+		expectedSortBy    string
+		expectedSortDesc  bool
 	}{
 		{
 			name:              "parse status filter",
@@ -426,18 +433,88 @@ func TestParseFilterOptions(t *testing.T) {
 			expectStatusSet:   true,
 			expectedStatusVal: "pending",
 			expectedLimit:     0,
+			expectedSortBy:    "created_at",
 		},
 		{
 			name:            "parse limit",
 			queryString:     "?limit=50",
 			expectStatusSet: false,
 			expectedLimit:   50,
+			expectedSortBy:  "created_at",
 		},
 		{
 			name:            "no filters",
 			queryString:     "",
 			expectStatusSet: false,
 			expectedLimit:   0,
+			expectedSortBy:  "created_at",
+		},
+		{
+			name:           "parse offset",
+			queryString:    "?offset=10",
+			expectedOffset: 10,
+			expectedSortBy: "created_at",
+		},
+		{
+			name:              "parse priority filter",
+			queryString:       "?priority=high",
+			expectPrioritySet: true,
+			expectedPriority:  "high",
+			expectedSortBy:    "created_at",
+		},
+		{
+			name:           "parse tag filter",
+			queryString:    "?tag=important",
+			expectTagSet:   true,
+			expectedTag:    "important",
+			expectedSortBy: "created_at",
+		},
+		{
+			name:           "parse sort_by",
+			queryString:    "?sort_by=title",
+			expectedSortBy: "title",
+		},
+		{
+			name:             "parse order desc",
+			queryString:      "?order=desc",
+			expectedSortBy:   "created_at",
+			expectedSortDesc: true,
+		},
+		{
+			name:            "invalid limit ignored",
+			queryString:     "?limit=invalid",
+			expectedLimit:   0,
+			expectedSortBy:  "created_at",
+		},
+		{
+			name:           "negative limit ignored",
+			queryString:    "?limit=-5",
+			expectedLimit:  0,
+			expectedSortBy: "created_at",
+		},
+		{
+			name:           "invalid offset ignored",
+			queryString:    "?offset=invalid",
+			expectedOffset: 0,
+			expectedSortBy: "created_at",
+		},
+		{
+			name:           "negative offset ignored",
+			queryString:    "?offset=-5",
+			expectedOffset: 0,
+			expectedSortBy: "created_at",
+		},
+		{
+			name:            "invalid status ignored",
+			queryString:     "?status=invalid_status",
+			expectStatusSet: false,
+			expectedSortBy:  "created_at",
+		},
+		{
+			name:              "invalid priority ignored",
+			queryString:       "?priority=invalid_priority",
+			expectPrioritySet: false,
+			expectedSortBy:    "created_at",
 		},
 	}
 
@@ -457,6 +534,66 @@ func TestParseFilterOptions(t *testing.T) {
 				assert.Nil(t, filter.Status)
 			}
 			assert.Equal(t, tt.expectedLimit, filter.Limit)
+			assert.Equal(t, tt.expectedOffset, filter.Offset)
+			assert.Equal(t, tt.expectedSortBy, filter.SortBy)
+			assert.Equal(t, tt.expectedSortDesc, filter.SortDesc)
+
+			if tt.expectPrioritySet {
+				require.NotNil(t, filter.Priority)
+				assert.Equal(t, tt.expectedPriority, string(*filter.Priority))
+			} else {
+				assert.Nil(t, filter.Priority)
+			}
+
+			if tt.expectTagSet {
+				require.NotNil(t, filter.Tag)
+				assert.Equal(t, tt.expectedTag, *filter.Tag)
+			} else {
+				assert.Nil(t, filter.Tag)
+			}
 		})
 	}
+}
+
+func TestListTasks_ServiceError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &MockTaskRepository{
+		GetAllFunc: func(filter task.FilterOptions) ([]*task.Task, error) {
+			return nil, errors.New("database error")
+		},
+	}
+	service := task.NewService(mockRepo)
+	handler := NewTaskHandler(service)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req, _ := http.NewRequest("GET", "/api/v1/tasks", nil)
+	c.Request = req
+
+	handler.ListTasks(c)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "INTERNAL_ERROR")
+}
+
+func TestUpdateTask_InvalidJSON(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mockRepo := &MockTaskRepository{}
+	service := task.NewService(mockRepo)
+	handler := NewTaskHandler(service)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "id", Value: "test-id"}}
+
+	req, _ := http.NewRequest("PUT", "/api/v1/tasks/test-id", bytes.NewBuffer([]byte("invalid json")))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req
+
+	handler.UpdateTask(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "INVALID_REQUEST")
 }

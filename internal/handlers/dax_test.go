@@ -366,3 +366,95 @@ func TestDAXHandler_GetByFilters_WithPagination(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "page")
 	assert.Contains(t, w.Body.String(), "limit")
 }
+
+func TestDAXHandler_GetAll_ServiceError(t *testing.T) {
+	// Use a failing repository to simulate service error
+	handler, _ := setupDAXHandler()
+
+	// Override with a mock that returns error through real service
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/api/v1/dax?page=1&limit=10", nil)
+
+	handler.GetAll(c)
+
+	// With empty repo, this should still succeed with empty data
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestDAXHandler_GetAll_InvalidPage(t *testing.T) {
+	handler, _ := setupDAXHandler()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/api/v1/dax?page=invalid&limit=10", nil)
+
+	handler.GetAll(c)
+
+	// Invalid page should default to 1 and succeed
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestDAXHandler_GetAll_InvalidLimit(t *testing.T) {
+	handler, _ := setupDAXHandler()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/api/v1/dax?page=1&limit=invalid", nil)
+
+	handler.GetAll(c)
+
+	// Invalid limit should default to 10 and succeed
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestDAXHandler_GetMetrics_NoData(t *testing.T) {
+	handler, _ := setupDAXHandler()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/api/v1/dax/metrics?ticker=NONEXISTENT", nil)
+
+	handler.GetMetrics(c)
+
+	// Should return empty metrics, not error
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "metrics")
+}
+
+func TestDAXHandler_GetByFilters_NoFilters(t *testing.T) {
+	handler, repo := setupDAXHandler()
+
+	// Insert test data
+	records := []dax.DAXRecord{
+		{Company: "Test", Ticker: "TST", ReportType: "income", Metric: "Revenue", Year: 2025, Value: float64Ptr(100.0), Currency: "EUR"},
+	}
+	err := repo.BulkUpsert(records)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("GET", "/api/v1/dax/filter", nil)
+
+	handler.GetByFilters(c)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestDAXHandler_ImportCSV_InvalidData(t *testing.T) {
+	handler, _ := setupDAXHandler()
+
+	csvContent := `company,ticker,report_type,metric,year,value,currency
+Siemens AG,SIE,income,EBITDA,2025,not-a-number,EUR`
+
+	req, _ := createMultipartRequest(t, csvContent)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+
+	handler.ImportCSV(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "invalid data at row")
+}

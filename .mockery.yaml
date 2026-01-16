@@ -1,8 +1,8 @@
 all: false
 dir: "{{.InterfaceDir}}/mocks"
 filename: "mock_{{.InterfaceName | snakecase}}.go"
-structname: "Mock{{.InterfaceName}}"
-pkgname: "mocks"
+mockname: "Mock{{.InterfaceName}}"
+outpkg: "mocks"
 packages:
   github.com/f00b455/blank-go/pkg/task:
     interfaces:
