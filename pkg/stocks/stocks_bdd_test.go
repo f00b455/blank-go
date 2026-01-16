@@ -3,7 +3,6 @@ package stocks_test
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,22 +11,29 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/f00b455/blank-go/internal/handlers"
 	"github.com/f00b455/blank-go/pkg/stocks"
+	"github.com/f00b455/blank-go/pkg/stocks/mocks"
 	"github.com/gin-gonic/gin"
 )
 
 type stocksFeatureContext struct {
-	router       *gin.Engine
-	response     *httptest.ResponseRecorder
-	responseBody map[string]interface{}
+	router        *gin.Engine
+	response      *httptest.ResponseRecorder
+	responseBody  map[string]interface{}
 	firstResponse *stocks.StockSummary
+	mockClient    *mocks.MockStocksClient
 }
 
 func (ctx *stocksFeatureContext) theYahooFinanceAPIIsAvailable() error {
 	gin.SetMode(gin.TestMode)
 
-	// Initialize stocks service
-	stocksClient := stocks.NewClient()
-	stocksService := stocks.NewService(stocksClient)
+	// Initialize mock client
+	ctx.mockClient = new(mocks.MockStocksClient)
+
+	// Setup mock responses for common test tickers
+	ctx.setupMockData()
+
+	// Initialize stocks service with mock client
+	stocksService := stocks.NewService(ctx.mockClient)
 	stocksHandler := handlers.NewStocksHandler(stocksService)
 
 	// Setup router
@@ -41,14 +47,119 @@ func (ctx *stocksFeatureContext) theYahooFinanceAPIIsAvailable() error {
 	return nil
 }
 
+func (ctx *stocksFeatureContext) setupMockData() {
+	// Mock data for AAPL
+	aaplQuote := &stocks.YahooQuote{
+		Symbol:                     "AAPL",
+		ShortName:                  "Apple Inc.",
+		RegularMarketPrice:         185.50,
+		RegularMarketOpen:          184.00,
+		RegularMarketHigh:          186.20,
+		RegularMarketLow:           183.50,
+		RegularMarketChange:        1.50,
+		RegularMarketChangePercent: 0.81,
+		RegularMarketVolume:        52000000,
+		Currency:                   "USD",
+	}
+
+	// Mock data for GOOGL
+	googlQuote := &stocks.YahooQuote{
+		Symbol:                     "GOOGL",
+		ShortName:                  "Alphabet Inc.",
+		RegularMarketPrice:         140.50,
+		RegularMarketOpen:          139.00,
+		RegularMarketHigh:          141.20,
+		RegularMarketLow:           138.50,
+		RegularMarketChange:        1.50,
+		RegularMarketChangePercent: 1.08,
+		RegularMarketVolume:        25000000,
+		Currency:                   "USD",
+	}
+
+	// Mock data for MSFT
+	msftQuote := &stocks.YahooQuote{
+		Symbol:                     "MSFT",
+		ShortName:                  "Microsoft Corporation",
+		RegularMarketPrice:         420.00,
+		RegularMarketOpen:          418.00,
+		RegularMarketHigh:          422.00,
+		RegularMarketLow:           417.50,
+		RegularMarketChange:        2.00,
+		RegularMarketChangePercent: 0.48,
+		RegularMarketVolume:        30000000,
+		Currency:                   "USD",
+	}
+
+	// Mock data for TSLA
+	tslaQuote := &stocks.YahooQuote{
+		Symbol:                     "TSLA",
+		ShortName:                  "Tesla, Inc.",
+		RegularMarketPrice:         245.00,
+		RegularMarketOpen:          243.00,
+		RegularMarketHigh:          247.00,
+		RegularMarketLow:           242.00,
+		RegularMarketChange:        2.00,
+		RegularMarketChangePercent: 0.82,
+		RegularMarketVolume:        45000000,
+		Currency:                   "USD",
+	}
+
+	// Mock data for AMZN
+	amznQuote := &stocks.YahooQuote{
+		Symbol:                     "AMZN",
+		ShortName:                  "Amazon.com, Inc.",
+		RegularMarketPrice:         178.00,
+		RegularMarketOpen:          176.50,
+		RegularMarketHigh:          179.00,
+		RegularMarketLow:           175.50,
+		RegularMarketChange:        1.50,
+		RegularMarketChangePercent: 0.85,
+		RegularMarketVolume:        35000000,
+		Currency:                   "USD",
+	}
+
+	// Setup mock expectations for single ticker requests
+	ctx.mockClient.On("GetQuote", "AAPL").Return(aaplQuote, nil).Maybe()
+	ctx.mockClient.On("GetQuote", "GOOGL").Return(googlQuote, nil).Maybe()
+	ctx.mockClient.On("GetQuote", "MSFT").Return(msftQuote, nil).Maybe()
+	ctx.mockClient.On("GetQuote", "TSLA").Return(tslaQuote, nil).Maybe()
+	ctx.mockClient.On("GetQuote", "AMZN").Return(amznQuote, nil).Maybe()
+	ctx.mockClient.On("GetQuote", "").Return(nil, fmt.Errorf("ticker is required")).Maybe()
+	ctx.mockClient.On("GetQuote", "INVALID_TICKER_XYZ").Return(nil, fmt.Errorf("ticker not found")).Maybe()
+	ctx.mockClient.On("GetQuote", "INVALID_XYZ").Return(nil, fmt.Errorf("ticker not found")).Maybe()
+
+	// Setup mock expectations for batch requests
+	ctx.mockClient.On("GetQuotes", []string{"AAPL", "GOOGL", "MSFT"}).Return(map[string]*stocks.YahooQuote{
+		"AAPL":  aaplQuote,
+		"GOOGL": googlQuote,
+		"MSFT":  msftQuote,
+	}, nil).Maybe()
+
+	ctx.mockClient.On("GetQuotes", []string{"AAPL"}).Return(map[string]*stocks.YahooQuote{
+		"AAPL": aaplQuote,
+	}, nil).Maybe()
+
+	ctx.mockClient.On("GetQuotes", []string{"AAPL", "INVALID_XYZ", "MSFT"}).Return(map[string]*stocks.YahooQuote{
+		"AAPL": aaplQuote,
+		"MSFT": msftQuote,
+	}, nil).Maybe()
+
+	ctx.mockClient.On("GetQuotes", []string{"AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"}).Return(map[string]*stocks.YahooQuote{
+		"AAPL":  aaplQuote,
+		"GOOGL": googlQuote,
+		"MSFT":  msftQuote,
+		"TSLA":  tslaQuote,
+		"AMZN":  amznQuote,
+	}, nil).Maybe()
+}
+
 func (ctx *stocksFeatureContext) iRequestStockSummaryForTicker(ticker string) error {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/stocks/"+ticker+"/summary", nil)
 	ctx.response = httptest.NewRecorder()
 	ctx.router.ServeHTTP(ctx.response, req)
 
 	if ctx.response.Code == http.StatusOK {
-		body, _ := io.ReadAll(ctx.response.Body)
-		_ = json.Unmarshal(body, &ctx.responseBody)
+		_ = json.Unmarshal([]byte(ctx.response.Body.String()), &ctx.responseBody)
 	}
 
 	return nil
@@ -59,15 +170,14 @@ func (ctx *stocksFeatureContext) iRequestBatchStockSummaryForTickers(tickers str
 	ctx.response = httptest.NewRecorder()
 	ctx.router.ServeHTTP(ctx.response, req)
 
-	body, _ := io.ReadAll(ctx.response.Body)
-	_ = json.Unmarshal(body, &ctx.responseBody)
+	_ = json.Unmarshal([]byte(ctx.response.Body.String()), &ctx.responseBody)
 
 	return nil
 }
 
 func (ctx *stocksFeatureContext) theResponseStatusShouldBe(expectedStatus int) error {
 	if ctx.response.Code != expectedStatus {
-		return fmt.Errorf("expected status %d, got %d", expectedStatus, ctx.response.Code)
+		return fmt.Errorf("expected status %d, got %d. Response body: %s", expectedStatus, ctx.response.Code, ctx.response.Body.String())
 	}
 	return nil
 }
@@ -172,12 +282,11 @@ func (ctx *stocksFeatureContext) theDateShouldBeInFormat(format string) error {
 }
 
 func (ctx *stocksFeatureContext) theErrorMessageShouldIndicate(message string) error {
-	body, _ := io.ReadAll(ctx.response.Body)
 	var errorResp map[string]interface{}
-	_ = json.Unmarshal(body, &errorResp)
+	_ = json.Unmarshal([]byte(ctx.response.Body.String()), &errorResp)
 
 	if errorMsg, ok := errorResp["error"].(string); !ok || !strings.Contains(errorMsg, message) {
-		return fmt.Errorf("error message should contain '%s'", message)
+		return fmt.Errorf("error message should contain '%s', got response: %s", message, ctx.response.Body.String())
 	}
 	return nil
 }
@@ -185,8 +294,7 @@ func (ctx *stocksFeatureContext) theErrorMessageShouldIndicate(message string) e
 func (ctx *stocksFeatureContext) iRequestStockSummaryForTickerAgainWithinCacheTTL(ticker string) error {
 	// Store first response
 	var firstSummary stocks.StockSummary
-	body, _ := io.ReadAll(ctx.response.Body)
-	_ = json.Unmarshal(body, &firstSummary)
+	_ = json.Unmarshal([]byte(ctx.response.Body.String()), &firstSummary)
 	ctx.firstResponse = &firstSummary
 
 	// Make second request
@@ -194,16 +302,19 @@ func (ctx *stocksFeatureContext) iRequestStockSummaryForTickerAgainWithinCacheTT
 	ctx.response = httptest.NewRecorder()
 	ctx.router.ServeHTTP(ctx.response, req)
 
-	body, _ = io.ReadAll(ctx.response.Body)
-	_ = json.Unmarshal(body, &ctx.responseBody)
+	_ = json.Unmarshal([]byte(ctx.response.Body.String()), &ctx.responseBody)
 
 	return nil
 }
 
 func (ctx *stocksFeatureContext) bothResponsesShouldBeIdentical() error {
-	// This is a simplified check - in real scenario we'd compare all fields
-	if ctx.firstResponse.Ticker != ctx.responseBody["ticker"] {
-		return fmt.Errorf("responses should be identical")
+	// Compare ticker from first response with second response
+	secondTicker, ok := ctx.responseBody["ticker"].(string)
+	if !ok {
+		return fmt.Errorf("second response does not contain ticker field")
+	}
+	if ctx.firstResponse.Ticker != secondTicker {
+		return fmt.Errorf("responses should be identical: first ticker=%s, second ticker=%s", ctx.firstResponse.Ticker, secondTicker)
 	}
 	return nil
 }
@@ -225,6 +336,10 @@ func (ctx *stocksFeatureContext) theResponseShouldContainStockSummaries(count in
 	}
 
 	return nil
+}
+
+func (ctx *stocksFeatureContext) theResponseShouldContainStockSummary(count int) error {
+	return ctx.theResponseShouldContainStockSummaries(count)
 }
 
 func (ctx *stocksFeatureContext) theResponseShouldIncludeTicker(ticker string) error {
@@ -328,6 +443,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	// Batch stock steps
 	ctx.Step(`^I request batch stock summary for tickers "([^"]*)"$`, featureCtx.iRequestBatchStockSummaryForTickers)
 	ctx.Step(`^the response should contain (\d+) stock summaries$`, featureCtx.theResponseShouldContainStockSummaries)
+	ctx.Step(`^the response should contain (\d+) stock summary$`, featureCtx.theResponseShouldContainStockSummary)
 	ctx.Step(`^the response should include ticker "([^"]*)"$`, featureCtx.theResponseShouldIncludeTicker)
 	ctx.Step(`^the response should contain (\d+) successful summaries$`, featureCtx.theResponseShouldContainSuccessfulSummaries)
 	ctx.Step(`^the response should contain (\d+) error$`, featureCtx.theResponseShouldContainError)
@@ -350,7 +466,7 @@ func TestFeatures(t *testing.T) {
 		ScenarioInitializer: InitializeScenario,
 		Options: &godog.Options{
 			Format:   "pretty",
-			Paths:    []string{"../../features"},
+			Paths:    []string{"../../features/stocks-batch.feature", "../../features/stocks-summary.feature"},
 			TestingT: t,
 		},
 	}
