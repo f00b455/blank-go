@@ -9,14 +9,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+
 	"github.com/f00b455/blank-go/internal/config"
 	"github.com/f00b455/blank-go/internal/database"
 	"github.com/f00b455/blank-go/internal/handlers"
 	"github.com/f00b455/blank-go/pkg/dax"
 	"github.com/f00b455/blank-go/pkg/task"
 	"github.com/f00b455/blank-go/pkg/weather"
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 func main() {

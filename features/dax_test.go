@@ -13,9 +13,10 @@ import (
 	"strings"
 
 	"github.com/cucumber/godog"
+	"github.com/gin-gonic/gin"
+
 	"github.com/f00b455/blank-go/internal/handlers"
 	"github.com/f00b455/blank-go/pkg/dax"
-	"github.com/gin-gonic/gin"
 )
 
 type daxContext struct {

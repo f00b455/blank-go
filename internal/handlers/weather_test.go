@@ -8,11 +8,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/f00b455/blank-go/internal/handlers/mocks"
-	"github.com/f00b455/blank-go/pkg/weather"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/f00b455/blank-go/internal/handlers/mocks"
+	"github.com/f00b455/blank-go/pkg/weather"
 )
 
 func TestNewWeatherHandler(t *testing.T) {

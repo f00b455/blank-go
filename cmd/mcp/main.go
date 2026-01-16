@@ -41,14 +41,14 @@ type ServerInfo struct {
 }
 
 type InitializeResult struct {
-	ProtocolVersion string            `json:"protocolVersion"`
-	ServerInfo      ServerInfo        `json:"serverInfo"`
-	Capabilities    map[string]any    `json:"capabilities"`
+	ProtocolVersion string         `json:"protocolVersion"`
+	ServerInfo      ServerInfo     `json:"serverInfo"`
+	Capabilities    map[string]any `json:"capabilities"`
 }
 
 type Tool struct {
-	Name        string     `json:"name"`
-	Description string     `json:"description"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
 	InputSchema InputSchema `json:"inputSchema"`
 }
 

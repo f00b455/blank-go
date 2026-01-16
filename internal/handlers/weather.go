@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/f00b455/blank-go/pkg/weather"
 	"github.com/gin-gonic/gin"
+
+	"github.com/f00b455/blank-go/pkg/weather"
 )
 
 const defaultForecastDays = 7

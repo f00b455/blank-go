@@ -8,19 +8,20 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/f00b455/blank-go/pkg/task"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/f00b455/blank-go/pkg/task"
 )
 
 // MockTaskRepository implements task.Repository for testing
 type MockTaskRepository struct {
-	CreateFunc     func(t *task.Task) error
-	GetByIDFunc    func(id string) (*task.Task, error)
-	GetAllFunc     func(filter task.FilterOptions) ([]*task.Task, error)
-	UpdateFunc     func(t *task.Task) error
-	DeleteFunc     func(id string) error
+	CreateFunc  func(t *task.Task) error
+	GetByIDFunc func(id string) (*task.Task, error)
+	GetAllFunc  func(filter task.FilterOptions) ([]*task.Task, error)
+	UpdateFunc  func(t *task.Task) error
+	DeleteFunc  func(id string) error
 }
 
 func (m *MockTaskRepository) Create(t *task.Task) error {
@@ -90,7 +91,7 @@ func TestCreateTask(t *testing.T) {
 			expectError:    false,
 		},
 		{
-			name: "invalid JSON body",
+			name:        "invalid JSON body",
 			requestBody: "invalid json",
 			mockCreateFunc: func(tk *task.Task) error {
 				return nil
@@ -192,11 +193,11 @@ func TestListTasks(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
-		name            string
-		query           string
-		mockGetAllFunc  func(filter task.FilterOptions) ([]*task.Task, error)
-		expectedStatus  int
-		expectedCount   int
+		name           string
+		query          string
+		mockGetAllFunc func(filter task.FilterOptions) ([]*task.Task, error)
+		expectedStatus int
+		expectedCount  int
 	}{
 		{
 			name:  "list all tasks",
@@ -481,10 +482,10 @@ func TestParseFilterOptions(t *testing.T) {
 			expectedSortDesc: true,
 		},
 		{
-			name:            "invalid limit ignored",
-			queryString:     "?limit=invalid",
-			expectedLimit:   0,
-			expectedSortBy:  "created_at",
+			name:           "invalid limit ignored",
+			queryString:    "?limit=invalid",
+			expectedLimit:  0,
+			expectedSortBy: "created_at",
 		},
 		{
 			name:           "negative limit ignored",
