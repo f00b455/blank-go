@@ -294,7 +294,7 @@ func (ctx *stocksFeatureContext) theErrorMessageShouldIndicate(message string) e
 func (ctx *stocksFeatureContext) iRequestStockSummaryForTickerAgainWithinCacheTTL(ticker string) error {
 	// Store first response
 	var firstSummary stocks.StockSummary
-	_ = json.Unmarshal([]byte(ctx.response.Body.String()), &firstSummary)
+	_ = json.Unmarshal(ctx.response.Body.Bytes(), &firstSummary)
 	ctx.firstResponse = &firstSummary
 
 	// Make second request
@@ -302,7 +302,7 @@ func (ctx *stocksFeatureContext) iRequestStockSummaryForTickerAgainWithinCacheTT
 	ctx.response = httptest.NewRecorder()
 	ctx.router.ServeHTTP(ctx.response, req)
 
-	_ = json.Unmarshal([]byte(ctx.response.Body.String()), &ctx.responseBody)
+	_ = json.Unmarshal(ctx.response.Body.Bytes(), &ctx.responseBody)
 
 	return nil
 }
