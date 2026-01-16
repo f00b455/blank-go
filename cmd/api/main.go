@@ -16,6 +16,7 @@ import (
 	"github.com/f00b455/blank-go/internal/database"
 	"github.com/f00b455/blank-go/internal/handlers"
 	"github.com/f00b455/blank-go/pkg/dax"
+	"github.com/f00b455/blank-go/pkg/stocks"
 	"github.com/f00b455/blank-go/pkg/task"
 	"github.com/f00b455/blank-go/pkg/weather"
 )
@@ -118,6 +119,17 @@ func setupRouter(cfg *config.Config, db interface{}, startTime time.Time) *gin.E
 		api.GET("/weather", weatherHandler.GetCurrentWeather)
 		api.GET("/weather/forecast", weatherHandler.GetForecast)
 		api.GET("/weather/cities/:city", weatherHandler.GetWeatherByCity)
+
+		// Stocks routes
+		stocksClient := stocks.NewClient()
+		stocksService := stocks.NewService(stocksClient)
+		stocksHandler := handlers.NewStocksHandler(stocksService)
+
+		stocksGroup := api.Group("/stocks")
+		{
+			stocksGroup.GET("/:ticker/summary", stocksHandler.GetStockSummary)
+			stocksGroup.GET("/summary", stocksHandler.GetBatchSummary)
+		}
 	}
 
 	return router

@@ -14,6 +14,10 @@ packages:
   github.com/f00b455/blank-go/pkg/dax:
     interfaces:
       Repository:
+  github.com/f00b455/blank-go/pkg/stocks:
+    interfaces:
+      StocksClient:
   github.com/f00b455/blank-go/internal/handlers:
     interfaces:
       WeatherService:
+      StocksService:
